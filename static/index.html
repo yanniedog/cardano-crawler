@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Cardano Reconciliation Crawler</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="wrap">
+      <section class="hero">
+        <h1>Cardano Transaction Reconciliation</h1>
+        <p>
+          Rebuild a complete ledger from your Binance exports plus every key set in
+          <code>keys</code>, while keeping crawler scope constrained to your wallet activity.
+        </p>
+      </section>
+
+      <section class="panel">
+        <h2>Inputs</h2>
+        <div class="grid">
+          <label>
+            <span>Keys File</span>
+            <input id="keys_file" type="text" placeholder="keys" />
+          </label>
+          <label>
+            <span>Binance Deposit Report</span>
+            <input id="deposit_file" type="text" placeholder="Deposit report .xlsx" />
+          </label>
+          <label>
+            <span>Binance Withdraw Report</span>
+            <input id="withdraw_file" type="text" placeholder="Withdraw report .xlsx" />
+          </label>
+          <label>
+            <span>Shelley Extra Gap</span>
+            <input id="shelley_extra_gap" type="number" min="0" max="300" value="30" />
+          </label>
+          <label>
+            <span>Shelley Scan Cap</span>
+            <input id="shelley_scan_cap" type="number" min="10" max="500" value="120" />
+          </label>
+          <label>
+            <span>Byron Scan Cap</span>
+            <input id="byron_scan_cap" type="number" min="10" max="500" value="80" />
+          </label>
+          <label>
+            <span>Byron Gap Limit</span>
+            <input id="byron_gap_limit" type="number" min="5" max="200" value="20" />
+          </label>
+          <label>
+            <span>Expansion Rounds</span>
+            <input id="max_expansion_rounds" type="number" min="1" max="30" value="8" />
+          </label>
+          <label>
+            <span>Co-Spend Input Cap</span>
+            <input id="co_spend_input_cap" type="number" min="5" max="200" value="35" />
+          </label>
+          <label>
+            <span>Co-Spend Output Cap</span>
+            <input id="co_spend_output_cap" type="number" min="5" max="200" value="35" />
+          </label>
+        </div>
+        <div class="actions">
+          <button id="run_btn">Run Reconciliation</button>
+          <span id="status"></span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Summary</h2>
+        <div id="summary_cards" class="cards"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Transactions</h2>
+        <div class="filters">
+          <label>
+            <span>Type</span>
+            <select id="type_filter">
+              <option value="">All</option>
+            </select>
+          </label>
+          <label>
+            <span>Search tx/address</span>
+            <input id="text_filter" type="text" placeholder="tx hash or address" />
+          </label>
+          <label>
+            <span>Limit</span>
+            <input id="limit_filter" type="number" min="10" value="500" />
+          </label>
+        </div>
+        <div class="table-wrap">
+          <table id="tx_table">
+            <thead>
+              <tr>
+                <th>UTC Time</th>
+                <th>Type</th>
+                <th>Net ADA</th>
+                <th>Fee</th>
+                <th>Inputs</th>
+                <th>Outputs</th>
+                <th>Origin Wallets</th>
+                <th>Destination Wallets</th>
+                <th>Tx Hash</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+    <script src="/static/app.js"></script>
+  </body>
+</html>
