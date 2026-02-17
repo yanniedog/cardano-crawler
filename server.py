@@ -271,7 +271,7 @@ def parse_keys_file(path: Path) -> ParsedKeys:
 
 
 def read_xlsx_records(path: Path) -> List[Dict[str, Any]]:
-    wb = openpyxl.load_workbook(path, data_only=True, read_only=True)
+    wb = openpyxl.load_workbook(path, data_only=True)
     ws = wb.active
     rows = list(ws.iter_rows(values_only=True))
     if not rows:
@@ -487,6 +487,12 @@ def collect_tx_hashes_for_addresses(
     return tx_hashes
 
 
+def addresses_for_direct_crawl(addresses: Set[str]) -> Set[str]:
+    # Account-level stake queries already cover reward-linked Shelley addresses.
+    # Direct address crawl is reserved for legacy/non-stake paths.
+    return {a for a in addresses if is_legacy_address(a)}
+
+
 def build_reconciliation(
     keys_file: Path,
     deposit_file: Path,
@@ -498,7 +504,12 @@ def build_reconciliation(
     max_expansion_rounds: int,
     co_spend_input_cap: int,
     co_spend_output_cap: int,
+    debug: bool = False,
 ) -> Dict[str, Any]:
+    def log(msg: str) -> None:
+        if debug:
+            print(f"[reconcile] {msg}", flush=True)
+
     if not keys_file.exists():
         raise FileNotFoundError(f"Missing keys file: {keys_file}")
     if not deposit_file.exists():
@@ -508,9 +519,18 @@ def build_reconciliation(
 
     parsed_keys = parse_keys_file(keys_file)
     koios = KoiosClient()
+    log(
+        "parsed keys: rewards=%d shelley_accounts=%d byron_xpubs=%d"
+        % (
+            len(parsed_keys.reward_addresses),
+            len(parsed_keys.shelley_accounts),
+            len(parsed_keys.byron_xpubs),
+        )
+    )
 
     deposit_records = normalize_binance_records(deposit_file, "deposit")
     withdraw_records = normalize_binance_records(withdraw_file, "withdraw")
+    log("parsed binance: deposits=%d withdrawals=%d" % (len(deposit_records), len(withdraw_records)))
     binance_deposit_hashes = {r.tx_hash for r in deposit_records}
     binance_withdraw_hashes = {r.tx_hash for r in withdraw_records}
     binance_deposit_addresses = {r.address for r in deposit_records if r.address}
@@ -522,6 +542,7 @@ def build_reconciliation(
     # Stake-account grounded discovery.
     all_tx_hashes: Set[str] = set(binance_deposit_hashes | binance_withdraw_hashes)
     for reward_addr in reward_addresses:
+        log(f"stake crawl: account_txs/account_addresses for {reward_addr}")
         for row in koios.account_txs(reward_addr):
             tx_hash = str(row.get("tx_hash", "") or "").lower()
             if tx_hash:
@@ -529,9 +550,14 @@ def build_reconciliation(
         for addr in koios.account_addresses(reward_addr, include_empty=True):
             if addr:
                 owned_addresses.add(addr)
+    log(
+        "after stake crawl: tx_hashes=%d owned_addresses=%d"
+        % (len(all_tx_hashes), len(owned_addresses))
+    )
 
     # Shelley xpub grounded discovery for all key sets.
     for account in parsed_keys.shelley_accounts:
+        log(f"shelley derive: account_index={account.account_index} xpub={account.xpub[:16]}...")
         ext_limit = min(
             shelley_scan_cap,
             max(account.fresh_external_index + shelley_extra_gap, shelley_extra_gap),
@@ -539,9 +565,13 @@ def build_reconciliation(
         int_limit = min(shelley_scan_cap, max(20, account.fresh_external_index // 2 + shelley_extra_gap))
         for addr in derive_shelley_addresses(account, ext_limit, int_limit):
             owned_addresses.add(addr)
+    log("after shelley derive: owned_addresses=%d" % len(owned_addresses))
 
     # Initial tx crawl for currently known owned addresses.
-    all_tx_hashes |= collect_tx_hashes_for_addresses(koios, owned_addresses)
+    all_tx_hashes |= collect_tx_hashes_for_addresses(
+        koios, addresses_for_direct_crawl(owned_addresses)
+    )
+    log("after direct crawl seed: tx_hashes=%d" % len(all_tx_hashes))
 
     # Pull tx details, then seed legacy addresses directly from Binance deposit txs.
     tx_cache: Dict[str, Dict[str, Any]] = {}
@@ -556,6 +586,7 @@ def build_reconciliation(
                 tx_cache[tx_hash] = tx
 
     ensure_tx_info(all_tx_hashes)
+    log("tx cache seeded: tx_cache=%d" % len(tx_cache))
 
     for record in deposit_records:
         tx = tx_cache.get(record.tx_hash)
@@ -569,6 +600,7 @@ def build_reconciliation(
             addr = extract_address(out)
             if addr and is_legacy_address(addr) and addr not in binance_deposit_addresses:
                 owned_addresses.add(addr)
+    log("after binance deposit legacy seeding: owned_addresses=%d" % len(owned_addresses))
 
     for addr in withdraw_destination_addresses:
         if is_legacy_address(addr):
@@ -576,28 +608,50 @@ def build_reconciliation(
 
     # Byron xpub scanning with strict gap stop, only if addresses are actually used.
     for byron_xpub in parsed_keys.byron_xpubs:
+        log(f"byron scan: xpub={byron_xpub[:16]}...")
         for chain in (Bip44Changes.CHAIN_EXT, Bip44Changes.CHAIN_INT):
             consecutive_unused = 0
-            for idx in range(byron_scan_cap):
-                addr = derive_byron_address(byron_xpub, chain, idx)
-                rows = koios.address_txs([addr])
-                if rows:
-                    consecutive_unused = 0
-                    owned_addresses.add(addr)
-                    for row in rows:
-                        tx_hash = str(row.get("tx_hash", "") or "").lower()
-                        if tx_hash:
-                            all_tx_hashes.add(tx_hash)
-                else:
-                    consecutive_unused += 1
-                if idx >= byron_gap_limit and consecutive_unused >= byron_gap_limit:
+            idx = 0
+            probe_batch = 10
+            while idx < byron_scan_cap:
+                stop = min(idx + probe_batch, byron_scan_cap)
+                batch_addrs = [derive_byron_address(byron_xpub, chain, i) for i in range(idx, stop)]
+                batch_rows = koios.address_txs(batch_addrs)
+                if not batch_rows:
+                    consecutive_unused += len(batch_addrs)
+                    if (stop - 1) >= byron_gap_limit and consecutive_unused >= byron_gap_limit:
+                        break
+                    idx = stop
+                    continue
+
+                # Only fan out to single-address checks when the batch is active.
+                for single_idx, addr in zip(range(idx, stop), batch_addrs):
+                    rows = koios.address_txs([addr])
+                    if rows:
+                        consecutive_unused = 0
+                        owned_addresses.add(addr)
+                        for row in rows:
+                            tx_hash = str(row.get("tx_hash", "") or "").lower()
+                            if tx_hash:
+                                all_tx_hashes.add(tx_hash)
+                    else:
+                        consecutive_unused += 1
+                    if single_idx >= byron_gap_limit and consecutive_unused >= byron_gap_limit:
+                        break
+                if (stop - 1) >= byron_gap_limit and consecutive_unused >= byron_gap_limit:
                     break
+                idx = stop
+    log("after byron scan: tx_hashes=%d owned_addresses=%d" % (len(all_tx_hashes), len(owned_addresses)))
 
     # Controlled expansion, only from transactions spending owned inputs.
     for _ in range(max_expansion_rounds):
+        round_idx = _ + 1
+        log(f"expansion round {round_idx}: start tx_hashes={len(all_tx_hashes)} owned={len(owned_addresses)}")
         new_addresses: Set[str] = set()
 
-        all_tx_hashes |= collect_tx_hashes_for_addresses(koios, owned_addresses)
+        all_tx_hashes |= collect_tx_hashes_for_addresses(
+            koios, addresses_for_direct_crawl(owned_addresses)
+        )
         ensure_tx_info(all_tx_hashes)
 
         for tx_hash, tx in tx_cache.items():
@@ -632,8 +686,8 @@ def build_reconciliation(
                     new_addresses.add(out_addr)
                     continue
                 if is_legacy_address(out_addr):
-                    # Legacy mode: only infer change aggressively for Binance deposit and simple tx shapes.
-                    if has_binance_deposit_output or len(output_addrs) <= 3:
+                    # Legacy mode: only infer change for explicit Binance-deposit shaped txs.
+                    if has_binance_deposit_output:
                         new_addresses.add(out_addr)
 
             # If cert references one of our reward addresses, keep it in-scope.
@@ -644,13 +698,17 @@ def build_reconciliation(
                         new_addresses.add(addr)
 
         truly_new = new_addresses - owned_addresses
+        log(f"expansion round {round_idx}: newly discovered addresses={len(truly_new)}")
         if not truly_new:
             break
         owned_addresses |= truly_new
 
     # Final tx sync.
-    all_tx_hashes |= collect_tx_hashes_for_addresses(koios, owned_addresses)
+    all_tx_hashes |= collect_tx_hashes_for_addresses(
+        koios, addresses_for_direct_crawl(owned_addresses)
+    )
     ensure_tx_info(all_tx_hashes)
+    log("final sync complete: tx_cache=%d owned_addresses=%d" % (len(tx_cache), len(owned_addresses)))
 
     records: List[Dict[str, Any]] = []
     for tx in tx_cache.values():
