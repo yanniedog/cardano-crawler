@@ -78,6 +78,80 @@
       </section>
 
       <section class="panel">
+        <h2>Interactive Wallet Graph</h2>
+        <div class="viz-controls-grid">
+          <label>
+            <span>Type Filter</span>
+            <select id="graph_type_filter">
+              <option value="">All</option>
+            </select>
+          </label>
+          <label>
+            <span>Date From (UTC)</span>
+            <input id="graph_date_from" type="date" />
+          </label>
+          <label>
+            <span>Date To (UTC)</span>
+            <input id="graph_date_to" type="date" />
+          </label>
+          <label>
+            <span>Min Edge ADA</span>
+            <input id="graph_min_ada" type="number" min="0" step="0.1" value="0" />
+          </label>
+          <label>
+            <span>Node Size</span>
+            <select id="graph_size_metric">
+              <option value="volume">Volume (in+out)</option>
+              <option value="tx_count">Tx Count</option>
+              <option value="net">Abs Net</option>
+            </select>
+          </label>
+          <label>
+            <span>Node Color</span>
+            <select id="graph_color_mode">
+              <option value="ownership">Owned vs External</option>
+              <option value="prefix">Address Prefix</option>
+              <option value="net">Net Direction</option>
+            </select>
+          </label>
+          <label>
+            <span>Search Wallet</span>
+            <input id="graph_search" type="text" placeholder="address prefix, full address, or tag" />
+          </label>
+          <label>
+            <span>Max Pairings / TX</span>
+            <input id="graph_max_pairings" type="number" min="10" max="2000" value="250" />
+          </label>
+          <label class="check-inline">
+            <span>Include External Wallets</span>
+            <input id="graph_include_external" type="checkbox" checked />
+          </label>
+          <label class="check-inline">
+            <span>Show Labels</span>
+            <input id="graph_show_labels" type="checkbox" />
+          </label>
+        </div>
+        <div class="viz-actions">
+          <button id="graph_refresh_btn">Refresh Graph</button>
+          <button id="graph_reset_zoom_btn" class="ghost">Reset Zoom</button>
+          <span id="viz_status"></span>
+        </div>
+        <div class="viz-main">
+          <div class="viz-canvas-wrap">
+            <div id="viz_stats" class="viz-stats"></div>
+            <svg id="wallet_graph"></svg>
+          </div>
+          <aside class="viz-details">
+            <h3 id="viz_detail_title">Selection</h3>
+            <div id="viz_detail_meta" class="viz-detail-meta">
+              Run reconciliation, then click a wallet bubble or flow line.
+            </div>
+            <div id="viz_detail_rows" class="viz-detail-rows"></div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="panel">
         <h2>Transactions</h2>
         <div class="filters">
           <label>
@@ -115,6 +189,7 @@
         </div>
       </section>
     </main>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
     <script src="/static/app.js"></script>
   </body>
 </html>

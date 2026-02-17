@@ -154,6 +154,157 @@ button:disabled {
   margin-bottom: 0.8rem;
 }
 
+.viz-controls-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 0.7rem;
+}
+
+.check-inline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.check-inline input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--accent);
+}
+
+.viz-actions {
+  margin-top: 0.8rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.viz-actions button {
+  width: auto;
+}
+
+.ghost {
+  width: auto;
+  background: #14303a;
+  color: var(--text);
+  border: 1px solid #2f5967;
+}
+
+.ghost:hover:not(:disabled) {
+  box-shadow: 0 6px 20px rgba(91, 144, 166, 0.3);
+}
+
+#viz_status {
+  color: var(--accent-2);
+  font-size: 0.86rem;
+}
+
+.viz-main {
+  margin-top: 0.8rem;
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 0.8rem;
+}
+
+.viz-canvas-wrap,
+.viz-details {
+  border: 1px solid #2a5260;
+  border-radius: 11px;
+  background: linear-gradient(180deg, rgba(22, 46, 56, 0.82), rgba(13, 28, 34, 0.88));
+}
+
+.viz-canvas-wrap {
+  min-height: 640px;
+  overflow: hidden;
+  position: relative;
+}
+
+.viz-stats {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.78rem;
+  color: var(--muted);
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid #2a5260;
+  background: rgba(14, 34, 40, 0.55);
+}
+
+#wallet_graph {
+  width: 100%;
+  height: 600px;
+  display: block;
+}
+
+.viz-details {
+  padding: 0.72rem;
+  max-height: 640px;
+  overflow: auto;
+}
+
+.viz-details h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1rem;
+  color: var(--accent);
+}
+
+.viz-detail-meta {
+  color: var(--muted);
+  font-size: 0.82rem;
+  margin-bottom: 0.65rem;
+}
+
+.viz-detail-rows {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.76rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.viz-row {
+  border: 1px solid #2a5260;
+  border-radius: 8px;
+  padding: 0.45rem;
+  background: rgba(14, 33, 39, 0.5);
+}
+
+.viz-row .k {
+  color: var(--muted);
+  margin-bottom: 0.15rem;
+}
+
+.viz-row .v {
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.graph-link {
+  stroke: rgba(152, 205, 221, 0.5);
+}
+
+.graph-link.active {
+  stroke: #ffd16d;
+  stroke-opacity: 0.95;
+}
+
+.graph-node {
+  stroke: rgba(7, 26, 34, 0.9);
+  stroke-width: 1.2px;
+  cursor: pointer;
+}
+
+.graph-node.active {
+  stroke: #ffd16d;
+  stroke-width: 2.4px;
+}
+
+.graph-label {
+  pointer-events: none;
+  fill: #d9ecf2;
+  font-size: 0.66rem;
+  font-family: "IBM Plex Mono", monospace;
+}
+
 .table-wrap {
   overflow: auto;
   border: 1px solid #274b56;
@@ -218,5 +369,17 @@ tr:nth-child(even) td {
 
   h1 {
     font-size: 1.35rem;
+  }
+
+  .viz-main {
+    grid-template-columns: 1fr;
+  }
+
+  .viz-canvas-wrap {
+    min-height: 520px;
+  }
+
+  #wallet_graph {
+    height: 480px;
   }
 }

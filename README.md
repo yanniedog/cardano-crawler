@@ -19,6 +19,7 @@ Open `http://127.0.0.1:8000`.
 ## Output
 
 - Web dashboard summary and transaction table
+- Interactive wallet graph (wallet bubbles + directional flows, with filters for dates, types, ownership, sizes, colors, search, and min amount)
 - Full JSON export at `output/latest-reconciliation.json`
 
 ## Notes

@@ -402,6 +402,24 @@ def tx_has_our_certificates(tx: Dict[str, Any], reward_addresses: Set[str]) -> b
     return False
 
 
+def io_entry_detail(
+    entry: Dict[str, Any],
+    owned_addresses: Set[str],
+    reward_addresses: Set[str],
+) -> Optional[Dict[str, Any]]:
+    addr = extract_address(entry)
+    if not addr:
+        return None
+    value = int(entry.get("value", "0") or 0)
+    return {
+        "address": addr,
+        "value_lovelace": value,
+        "value_ada": format_ada(value),
+        "stake_address": entry.get("stake_addr"),
+        "owned": tx_entry_is_owned(entry, owned_addresses, reward_addresses),
+    }
+
+
 def classify_tx(
     tx: Dict[str, Any],
     owned_addresses: Set[str],
@@ -753,6 +771,25 @@ def build_reconciliation(
                 if not tx_entry_is_owned(e, owned_addresses, reward_addresses) and extract_address(e)
             }
         )
+        input_details = [
+            d
+            for d in (
+                io_entry_detail(e, owned_addresses, reward_addresses)
+                for e in inputs
+            )
+            if d is not None
+        ]
+        output_details = [
+            d
+            for d in (
+                io_entry_detail(e, owned_addresses, reward_addresses)
+                for e in outputs
+            )
+            if d is not None
+        ]
+        total_output_lovelace = int(tx.get("total_output", "0") or 0)
+        tx_fee_lovelace = int(tx.get("fee", "0") or 0)
+        tx_deposit_lovelace = int(tx.get("deposit", "0") or 0)
         records.append(
             {
                 "tx_hash": tx_hash,
@@ -761,25 +798,33 @@ def build_reconciliation(
                     int(tx.get("tx_timestamp", 0) or 0), tz=timezone.utc
                 ).isoformat(),
                 "block_height": tx.get("block_height"),
+                "epoch_no": tx.get("epoch_no"),
+                "tx_size": tx.get("tx_size"),
                 "type": primary,
                 "tags": tags,
                 "origin_wallets": sorted({extract_address(e) for e in inputs if extract_address(e)}),
                 "destination_wallets": sorted(
                     {extract_address(e) for e in outputs if extract_address(e)}
                 ),
+                "input_details": input_details,
+                "output_details": output_details,
                 "owned_input_addresses": owned_input_addrs,
                 "owned_output_addresses": owned_output_addrs,
                 "counterparty_input_addresses": counterparty_input_addrs,
                 "counterparty_output_addresses": counterparty_output_addrs,
                 "inputs_count": len(inputs),
                 "outputs_count": len(outputs),
+                "total_output_lovelace": total_output_lovelace,
+                "total_output_ada": format_ada(total_output_lovelace),
                 "ada_in_lovelace": ada_in,
                 "ada_out_lovelace": ada_out,
-                "fee_lovelace": int(tx.get("fee", "0") or 0),
+                "fee_lovelace": tx_fee_lovelace,
                 "net_lovelace": net,
+                "deposit_lovelace": tx_deposit_lovelace,
+                "deposit_ada": format_ada(tx_deposit_lovelace),
                 "ada_in": format_ada(ada_in),
                 "ada_out": format_ada(ada_out),
-                "fee": format_ada(int(tx.get("fee", "0") or 0)),
+                "fee": format_ada(tx_fee_lovelace),
                 "net_ada": format_ada(net),
                 "withdrawal_lovelace": tx_withdrawal_sum(withdrawals, reward_addresses),
             }
