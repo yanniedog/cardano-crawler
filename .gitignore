@@ -1,3 +1,4 @@
 *.xlsx
 keys
 __pycache__/
+output/
