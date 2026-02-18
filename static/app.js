@@ -39,28 +39,34 @@ function addrPrefix(addr) {
 
 function setStatus(text, isError = false) {
   const node = el("status");
-  node.textContent = text;
-  node.style.color = isError ? "#ff8080" : "";
+  if (node) {
+    node.textContent = text;
+    node.style.color = isError ? "#ff8080" : "";
+  }
 }
 
 function setVizStatus(text, isError = false) {
   const node = el("viz_status");
-  node.textContent = text;
-  node.style.color = isError ? "#ff8080" : "";
+  if (node) {
+    node.textContent = text;
+    node.style.color = isError ? "#ff8080" : "";
+  }
 }
 
 function readPayload() {
+  const v = (id, def = "") => (el(id) && el(id).value != null ? String(el(id).value).trim() : def);
+  const n = (id, def = 0) => (el(id) && el(id).value != null ? Number(el(id).value) : def);
   return {
-    keys_file: el("keys_file").value.trim(),
-    deposit_file: el("deposit_file").value.trim(),
-    withdraw_file: el("withdraw_file").value.trim(),
-    shelley_extra_gap: Number(el("shelley_extra_gap").value),
-    shelley_scan_cap: Number(el("shelley_scan_cap").value),
-    byron_scan_cap: Number(el("byron_scan_cap").value),
-    byron_gap_limit: Number(el("byron_gap_limit").value),
-    max_expansion_rounds: Number(el("max_expansion_rounds").value),
-    co_spend_input_cap: Number(el("co_spend_input_cap").value),
-    co_spend_output_cap: Number(el("co_spend_output_cap").value),
+    keys_file: v("keys_file"),
+    deposit_file: v("deposit_file"),
+    withdraw_file: v("withdraw_file"),
+    shelley_extra_gap: n("shelley_extra_gap", 30),
+    shelley_scan_cap: n("shelley_scan_cap", 120),
+    byron_scan_cap: n("byron_scan_cap", 80),
+    byron_gap_limit: n("byron_gap_limit", 20),
+    max_expansion_rounds: n("max_expansion_rounds", 8),
+    co_spend_input_cap: n("co_spend_input_cap", 35),
+    co_spend_output_cap: n("co_spend_output_cap", 35),
   };
 }
 
@@ -669,7 +675,7 @@ async function loadDefaults() {
 
 async function runReconcile() {
   const btn = el("run_btn");
-  btn.disabled = true;
+  if (btn) btn.disabled = true;
   setStatus("Running reconciliation... this can take a while.");
   setVizStatus("Waiting for reconciliation...");
   try {
@@ -678,7 +684,7 @@ async function runReconcile() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(readPayload()),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       throw new Error(data.detail || "Reconciliation failed");
     }
@@ -695,17 +701,23 @@ async function runReconcile() {
     setStatus(err.message || String(err), true);
     setVizStatus("Reconciliation failed. Graph unavailable.", true);
   } finally {
-    btn.disabled = false;
+    if (btn) btn.disabled = false;
   }
 }
 
-el("run_btn").addEventListener("click", runReconcile);
-el("type_filter").addEventListener("change", renderTransactions);
-el("text_filter").addEventListener("input", renderTransactions);
-el("limit_filter").addEventListener("input", renderTransactions);
+const runBtn = el("run_btn");
+if (runBtn) runBtn.addEventListener("click", runReconcile);
+const typeFilter = el("type_filter");
+if (typeFilter) typeFilter.addEventListener("change", renderTransactions);
+const textFilter = el("text_filter");
+if (textFilter) textFilter.addEventListener("input", renderTransactions);
+const limitFilter = el("limit_filter");
+if (limitFilter) limitFilter.addEventListener("input", renderTransactions);
 
-el("graph_refresh_btn").addEventListener("click", refreshGraph);
-el("graph_reset_zoom_btn").addEventListener("click", resetGraphZoom);
+const graphRefreshBtn = el("graph_refresh_btn");
+if (graphRefreshBtn) graphRefreshBtn.addEventListener("click", refreshGraph);
+const graphResetZoomBtn = el("graph_reset_zoom_btn");
+if (graphResetZoomBtn) graphResetZoomBtn.addEventListener("click", resetGraphZoom);
 
 [
   "graph_type_filter",
@@ -719,8 +731,11 @@ el("graph_reset_zoom_btn").addEventListener("click", resetGraphZoom);
   "graph_search",
   "graph_max_pairings",
 ].forEach((id) => {
-  el(id).addEventListener("input", refreshGraph);
-  el(id).addEventListener("change", refreshGraph);
+  const node = el(id);
+  if (node) {
+    node.addEventListener("input", refreshGraph);
+    node.addEventListener("change", refreshGraph);
+  }
 });
 
 loadDefaults().catch(() => {});

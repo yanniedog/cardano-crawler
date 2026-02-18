@@ -3,3 +3,6 @@ keys
 __pycache__/
 output/
 output/latest-reconciliation.json
+.cursor/
+*.log
+

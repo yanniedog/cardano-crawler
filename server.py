@@ -3,6 +3,7 @@ from __future__ import annotations
 import glob
 import json
 import re
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
@@ -28,6 +29,9 @@ from pydantic import BaseModel, Field
 
 KOIOS_BASE_URL = "https://api.koios.rest/api/v1"
 LOVELACE_PER_ADA = 1_000_000
+# Koios tier limits: avoid 429 by limiting response size and request rate
+KOIOS_ACCOUNT_TXS_PAGE_SIZE = 1000
+KOIOS_REQUEST_DELAY_SEC = 0.12
 
 
 def chunked(items: List[str], size: int) -> Iterable[List[str]]:
@@ -150,7 +154,25 @@ class KoiosClient:
         return response.json()
 
     def account_txs(self, stake_address: str) -> List[Dict[str, Any]]:
-        return self.get("account_txs", {"_stake_address": stake_address})
+        out: List[Dict[str, Any]] = []
+        offset = 0
+        while True:
+            params: Dict[str, Any] = {
+                "_stake_address": stake_address,
+                "limit": KOIOS_ACCOUNT_TXS_PAGE_SIZE,
+                "offset": offset,
+            }
+            page = self.get("account_txs", params)
+            if not page:
+                break
+            out.extend(page)
+            if len(page) < KOIOS_ACCOUNT_TXS_PAGE_SIZE:
+                break
+            offset += len(page)
+            time.sleep(KOIOS_REQUEST_DELAY_SEC)
+        if out:
+            time.sleep(KOIOS_REQUEST_DELAY_SEC)
+        return out
 
     def account_addresses(self, stake_address: str, include_empty: bool = True) -> List[str]:
         payload: Dict[str, Any] = {"_stake_addresses": [stake_address]}
